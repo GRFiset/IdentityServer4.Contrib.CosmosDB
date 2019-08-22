@@ -84,26 +84,5 @@ namespace Host
             app.UseHttpsRedirection();
             app.UseMvcWithDefaultRoute();
         }
-
-        private static async Task EnsureSeedData(IConfigurationDbContext context)
-        {
-            foreach (IdentityServer4.Models.Client client in Clients.Get().ToList())
-            {
-                var dbRecords = await context.GetDocument<Client>(x => x.ClientId == client.ClientId);
-                if (dbRecords.ToList().Count == 0) await context.AddDocument(client.ToEntity());
-            }
-
-            foreach (IdentityServer4.Models.IdentityResource resource in Resources.GetIdentityResources().ToList())
-            {
-                var dbRecords = await context.GetDocument<IdentityResource>();
-                if (dbRecords.ToList().Count == 0) await context.AddDocument(resource.ToEntity());
-            }
-
-            foreach (IdentityServer4.Models.ApiResource resource in Resources.GetApiResources().ToList())
-            {
-                var dbRecords = await context.GetDocument<ApiResource>();
-                if (dbRecords.ToList().Count == 0) await context.AddDocument(resource.ToEntity());
-            }
-        }
     }
 }

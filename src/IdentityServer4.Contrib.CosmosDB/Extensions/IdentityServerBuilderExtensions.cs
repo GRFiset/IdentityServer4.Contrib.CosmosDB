@@ -101,7 +101,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Extensions
 
         private static IIdentityServerBuilder AddConfigurationStore(this IIdentityServerBuilder builder)
         {
-            builder.Services.AddSingleton<ICosmostClient, CosmosClient>();
+            builder.Services.AddSingleton<ICosmosClient, CosmosClient>();
             builder.Services.AddScoped<IConfigurationDbContext, ConfigurationDbContext>();
             builder.Services.AddTransient<IClientStore, ClientStore>();
             builder.Services.AddTransient<IResourceStore, ResourceStore>();
@@ -114,7 +114,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Extensions
             this IIdentityServerBuilder builder,
             Action<TokenCleanupOptions> tokenCleanUpOptions = null)
         {
-            builder.Services.AddSingleton<ICosmostClient, CosmosClient>();
+            builder.Services.AddSingleton<ICosmosClient, CosmosClient>();
             builder.Services.AddScoped<IPersistedGrantDbContext, PersistedGrantDbContext>();
             builder.Services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
 

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace IdentityServer4.Contrib.CosmosDB.DbContext
 {
-    public class CosmosClient : ICosmostClient
+    public class CosmosClient : ICosmosClient
     {
         /// <summary>
         ///     CosmosDb Document Client.

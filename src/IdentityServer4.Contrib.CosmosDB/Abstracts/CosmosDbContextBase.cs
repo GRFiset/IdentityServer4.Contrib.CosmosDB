@@ -34,7 +34,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
         /// <param name="connectionPolicy"></param>
         /// <param name="logger"></param>
         protected CosmosDbContextBase(IOptions<CosmosDbConfiguration> settings,
-                                      ICosmostClient cosmostClient,
+                                      ICosmosClient cosmostClient,
                                       ILogger logger = null)
         {
             Guard.ForNullOrDefault(settings.Value, nameof(settings));

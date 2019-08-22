@@ -2,7 +2,7 @@
 
 namespace IdentityServer4.Contrib.CosmosDB.DbContext
 {
-    public interface ICosmostClient
+    public interface ICosmosClient
     {
         DocumentClient DocumentClient { get; }
     }
