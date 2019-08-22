@@ -23,43 +23,34 @@ namespace IdentityServer4.Contrib.CosmosDB.Stores
             _logger = logger;
         }
 
-        public Task<IEnumerable<IdentityResource>> FindIdentityResourcesByScopeAsync(IEnumerable<string> scopeNames)
+        public async Task<IEnumerable<IdentityResource>> FindIdentityResourcesByScopeAsync(IEnumerable<string> scopeNames)
         {
             var scopes = scopeNames.ToArray();
 
-            var resources = from identityResource in _context.IdentityResources()
-                where scopes.Contains(identityResource.Name)
-                select identityResource;
+            var resources = await _context.GetDocument<Entities.IdentityResource>(x => scopes.Contains(x.Name));
 
-            var results = resources.ToArray();
+            _logger.LogDebug("Found {scopes} identity scopes in database", resources.Select(x => x.Name));
 
-            _logger.LogDebug("Found {scopes} identity scopes in database", results.Select(x => x.Name));
-
-            return Task.FromResult(results.Select(x => x.ToModel()).ToArray().AsEnumerable());
+            return resources.Select(x => x.ToModel()).ToArray().AsEnumerable();
         }
 
-        public Task<IEnumerable<ApiResource>> FindApiResourcesByScopeAsync(IEnumerable<string> scopeNames)
+        public async Task<IEnumerable<ApiResource>> FindApiResourcesByScopeAsync(IEnumerable<string> scopeNames)
         {
             var names = scopeNames.ToArray();
 
-            var apis = from api in _context.ApiResources().ToList()
-                where api.Scopes.Any(x => names.Contains(x.Name))
-                select api;
+            var apis = await _context.GetDocument<Entities.ApiResource>(x => names.Contains(x.Name));
 
-            var results = apis.ToArray();
-            var models = results.Select(x => x.ToModel()).ToArray();
+            var models = apis.Select(x => x.ToModel()).ToArray();
 
             _logger.LogDebug("Found {scopes} API scopes in database",
                 models.SelectMany(x => x.Scopes).Select(x => x.Name));
 
-            return Task.FromResult(models.AsEnumerable());
+            return models.AsEnumerable();
         }
 
-        public Task<ApiResource> FindApiResourceAsync(string name)
+        public async Task<ApiResource> FindApiResourceAsync(string name)
         {
-            var apis = from apiResource in _context.ApiResources()
-                where apiResource.Name == name
-                select apiResource;
+            IEnumerable<Entities.ApiResource> apis = await _context.GetDocument<Entities.ApiResource>(a => a.Name == name);
 
             var api = apis.FirstOrDefault();
 
@@ -68,14 +59,14 @@ namespace IdentityServer4.Contrib.CosmosDB.Stores
             else
                 _logger.LogDebug($"Did not find {name} API resource in database");
 
-            return Task.FromResult(api.ToModel());
+            return api.ToModel();
         }
 
-        public Task<Resources> GetAllResourcesAsync()
+        public async Task<Resources> GetAllResourcesAsync()
         {
-            var identity = _context.IdentityResources();
+            IEnumerable<Entities.IdentityResource> identity = await _context.GetDocument<Entities.IdentityResource>();
 
-            var apis = _context.ApiResources();
+            IEnumerable<Entities.ApiResource> apis = await _context.GetDocument<Entities.ApiResource>();
 
             var result = new Resources(
                 identity.ToArray().Select(x => x.ToModel()).AsEnumerable(),
@@ -85,7 +76,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Stores
                 result.IdentityResources.Select(x => x.Name)
                     .Union(result.ApiResources.SelectMany(x => x.Scopes).Select(x => x.Name)));
 
-            return Task.FromResult(result);
+            return result;
         }
     }
 }

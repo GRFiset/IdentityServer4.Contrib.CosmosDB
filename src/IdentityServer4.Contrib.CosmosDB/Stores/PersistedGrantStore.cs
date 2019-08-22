@@ -24,52 +24,53 @@ namespace IdentityServer4.Contrib.CosmosDB.Stores
             _logger = logger;
         }
 
-        public Task StoreAsync(PersistedGrant token)
+        public async Task StoreAsync(PersistedGrant token)
         {
             try
             {
-                var existing = _context.PersistedGrants().SingleOrDefault(x => x.Key == token.Key);
+                var existing = (await _context.PersistedGrants(x => x.Key == token.Key)).ToList().SingleOrDefault();
+
                 if (existing == null)
                 {
                     _logger.LogDebug("{persistedGrantKey} not found in database", token.Key);
 
                     var persistedGrant = token.ToEntity();
-                    _context.Add(persistedGrant);
+                    await _context.Add(persistedGrant);
                 }
                 else
                 {
                     _logger.LogDebug("{persistedGrantKey} found in database", token.Key);
 
                     token.UpdateEntity(existing);
-                    _context.Update(x => x.Key == token.Key, existing);
+                    await _context.Update(x => x.Key == token.Key, existing);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(0, ex, "Exception storing persisted grant");
             }
-
-            return Task.FromResult(0);
         }
 
-        public Task<PersistedGrant> GetAsync(string key)
+        public async Task<PersistedGrant> GetAsync(string key)
         {
-            var persistedGrant = _context.PersistedGrants().FirstOrDefault(x => x.Key == key);
-            var model = persistedGrant.ToModel();
+            var persistedGrant = (await _context.PersistedGrants(x => x.Key == key)).ToList();
+
+            PersistedGrant model = persistedGrant.FirstOrDefault()?.ToModel();
 
             _logger.LogDebug($"{key} found in database: {model != null}");
 
-            return Task.FromResult(model);
+            return model;
         }
 
-        public Task<IEnumerable<PersistedGrant>> GetAllAsync(string subjectId)
+        public async Task<IEnumerable<PersistedGrant>> GetAllAsync(string subjectId)
         {
-            var persistedGrants = _context.PersistedGrants().Where(x => x.SubjectId == subjectId).ToList();
+            var persistedGrants = (await _context.PersistedGrants(x => x.SubjectId == subjectId)).ToList();
+
             var model = persistedGrants.Select(x => x.ToModel());
 
             _logger.LogDebug($"{persistedGrants.Count} persisted grants found for {subjectId}");
 
-            return Task.FromResult(model);
+            return model;
         }
 
         public Task RemoveAsync(string key)

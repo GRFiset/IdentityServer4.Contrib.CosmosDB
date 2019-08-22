@@ -22,6 +22,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Mappers
 
             // model to entity
             CreateMap<Models.IdentityResource, IdentityResource>(MemberList.Source)
+                .ForMember(x => x.Kind, opt => opt.MapFrom(o => typeof(IdentityResource).Name))
                 .ForMember(x => x.UserClaims,
                     opts => opts.MapFrom(src => src.UserClaims.Select(x => new IdentityClaim {Type = x})));
         }

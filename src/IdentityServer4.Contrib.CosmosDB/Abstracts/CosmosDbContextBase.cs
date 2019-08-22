@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Net;
 using IdentityServer4.Contrib.CosmosDB.Configuration;
+using IdentityServer4.Contrib.CosmosDB.DbContext;
 using IdentityServer4.Contrib.CosmosDB.Extensions;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
@@ -33,9 +34,8 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
         /// <param name="connectionPolicy"></param>
         /// <param name="logger"></param>
         protected CosmosDbContextBase(IOptions<CosmosDbConfiguration> settings,
-            string databaseName,
-            ConnectionPolicy connectionPolicy = null,
-            ILogger logger = null)
+                                      ICosmostClient cosmostClient,
+                                      ILogger logger = null)
         {
             Guard.ForNullOrDefault(settings.Value, nameof(settings));
             Guard.ForNullOrDefault(settings.Value.EndPointUrl, nameof(settings.Value.EndPointUrl));
@@ -43,11 +43,9 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
             Logger = logger;
             Configuration = settings.Value;
 
-            var serviceEndPoint = new Uri(settings.Value.EndPointUrl);
-            DocumentClient = new DocumentClient(serviceEndPoint, settings.Value.PrimaryKey,
-                connectionPolicy ?? ConnectionPolicy.Default);
+            DocumentClient = cosmostClient.DocumentClient;
 
-            EnsureDatabaseCreated(databaseName);
+            //EnsureDatabaseCreated(databaseName);
         }
 
         /// <summary>
@@ -58,7 +56,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
         /// <summary>
         ///     Instance of CosmosDb Database.
         /// </summary>
-        protected Database Database { get; private set; }
+        private Database Database { get; set; }
 
         /// <summary>
         ///     URL for CosmosDb Instance.
@@ -85,7 +83,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
                    ?? Constants.DefaultReserveUnits;
         }
 
-        private void EnsureDatabaseCreated(string databaseName)
+        protected void EnsureDatabaseCreated(string databaseName)
         {
             var dbNameToUse = Configuration.DatabaseName.GetValueOrDefault(databaseName);
 

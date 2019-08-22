@@ -108,7 +108,7 @@ namespace IdentityServer4.Contrib.CosmosDB
                 {
                     using (var context = serviceScope.ServiceProvider.GetService<IPersistedGrantDbContext>())
                     {
-                        var expired = context.PersistedGrants().Where(x => x.Expiration < DateTime.UtcNow).ToList();
+                        var expired = (await context.PersistedGrants(x => x.Expiration < DateTime.UtcNow)).ToList();
 
                         _logger.LogDebug("Clearing {tokenCount} tokens", expired.Count);
 

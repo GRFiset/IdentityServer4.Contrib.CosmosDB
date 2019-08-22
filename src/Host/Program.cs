@@ -1,9 +1,16 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Host.Configuration;
+using IdentityServer4.Contrib.CosmosDB.Entities;
+using IdentityServer4.Contrib.CosmosDB.Extensions;
+using IdentityServer4.Contrib.CosmosDB.Interfaces;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace Host
@@ -22,7 +29,7 @@ namespace Host
             .AddEnvironmentVariables()
             .Build();
 
-        public static int Main(string[] args)
+        public static async Task<int> Main(string[] args)
         {
             Console.Title = $"{AppName}-v{AppVersion}";
 
@@ -38,7 +45,16 @@ namespace Host
             {
                 Log.Information($"Starting up {Console.Title}...");
 
-                CreateWebHostBuilder(args).Run();
+                IWebHost webHost = CreateWebHostBuilder(args);
+
+                // Setup Databases
+                using (IServiceScope serviceScope = webHost.Services.CreateScope())
+                {
+                    await EnsureSeedData(serviceScope.ServiceProvider.GetService<IConfigurationDbContext>(),
+                                         serviceScope.ServiceProvider.GetService<IPersistedGrantDbContext>());
+                }
+
+                await webHost.RunAsync();
 
                 return 0;
             }
@@ -57,5 +73,29 @@ namespace Host
             .UseSerilog()
             .UseStartup<Startup>()
             .Build();
+
+        private static async Task EnsureSeedData(IConfigurationDbContext configContext, IPersistedGrantDbContext persistedGrantContext)
+        {
+            await configContext.EnsureConfigurationsCollectionCreated();
+            await persistedGrantContext.SetupPersistedGrants();
+
+            foreach (IdentityServer4.Models.Client client in Clients.Get().ToList())
+            {
+                var dbRecords = await configContext.GetDocument<Client>(x => x.ClientId == client.ClientId);
+                if (dbRecords.ToList().Count == 0) await configContext.AddDocument(client.ToEntity());
+            }
+
+            foreach (IdentityServer4.Models.IdentityResource resource in Resources.GetIdentityResources().ToList())
+            {
+                var dbRecords = await configContext.GetDocument<IdentityResource>(x => x.Name == resource.Name);
+                if (dbRecords.ToList().Count == 0) await configContext.AddDocument(resource.ToEntity());
+            }
+
+            foreach (IdentityServer4.Models.ApiResource resource in Resources.GetApiResources().ToList())
+            {
+                var dbRecords = await configContext.GetDocument<ApiResource>(x => x.Name == resource.Name);
+                if (dbRecords.ToList().Count == 0) await configContext.AddDocument(resource.ToEntity());
+            }
+        }
     }
 }

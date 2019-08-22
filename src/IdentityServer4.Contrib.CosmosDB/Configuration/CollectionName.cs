@@ -8,6 +8,7 @@
         ApiResources,
         Clients,
         IdentityResources,
-        PersistedGrants
+        PersistedGrants,
+        Global
     }
 }

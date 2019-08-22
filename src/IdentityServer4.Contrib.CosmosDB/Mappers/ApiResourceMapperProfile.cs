@@ -30,6 +30,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Mappers
 
             // model to entity
             CreateMap<Models.ApiResource, ApiResource>(MemberList.Source)
+                .ForMember(x => x.Kind, opt => opt.MapFrom(o => typeof(ApiResource).Name))
                 .ForMember(x => x.Secrets, opts => opts.MapFrom(src => src.ApiSecrets.Select(x => x)))
                 .ForMember(x => x.Scopes, opts => opts.MapFrom(src => src.Scopes.Select(x => x)))
                 .ForMember(x => x.UserClaims,

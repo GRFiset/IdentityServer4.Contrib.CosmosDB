@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -8,7 +9,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Interfaces
 {
     public interface IPersistedGrantDbContext : IDisposable
     {
-        IQueryable<PersistedGrant> PersistedGrants(string partitionKey = "");
+        Task<IEnumerable<PersistedGrant>> PersistedGrants(Expression<Func<PersistedGrant, bool>> predicate = null, string partitionKey = "");
 
         Task Add(PersistedGrant entity);
 
@@ -19,5 +20,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Interfaces
         Task Remove(Expression<Func<PersistedGrant, bool>> filter);
 
         Task RemoveExpired();
+
+        Task SetupPersistedGrants();
     }
 }

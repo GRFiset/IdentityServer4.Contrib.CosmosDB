@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using IdentityServer4.Contrib.CosmosDB.Extensions;
 using IdentityServer4.Contrib.CosmosDB.Interfaces;
@@ -22,17 +24,15 @@ namespace IdentityServer4.Contrib.CosmosDB.Stores
             _logger = logger;
         }
 
-        public Task<Client> FindClientByIdAsync(string clientId)
+        public async Task<Client> FindClientByIdAsync(string clientId)
         {
-            // TECH DEBT : CosmosDB currently does not support first FirstOrDefault
-            //var client = _context.Clients(clientId).FirstOrDefault(x => x.ClientId == clientId);
-            var clients = _context.Clients(clientId).ToList();
+            IEnumerable<Entities.Client> clients = await _context.GetDocument<Entities.Client>(c => c.ClientId == clientId);
 
-            var model = clients?.FirstOrDefault().ToModel();
+            Client model = clients?.ToList().FirstOrDefault().ToModel();
 
             _logger.LogDebug($"{clientId} found in database: {model != null}");
 
-            return Task.FromResult(model);
+            return model;
         }
     }
 }

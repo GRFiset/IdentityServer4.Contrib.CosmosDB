@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using IdentityServer4.Contrib.CosmosDB.Mappers;
-using IdentityServer4.Models;
 
 namespace IdentityServer4.Contrib.CosmosDB.Extensions
 {
@@ -23,9 +22,9 @@ namespace IdentityServer4.Contrib.CosmosDB.Extensions
         /// </summary>
         /// <param name="entity">The IdentityServer4.Contrib.CosmosDB.Entities.Client to gather data from.</param>
         /// <returns>An instance of IdentityServer4.Models.Client.</returns>
-        public static Client ToModel(this Entities.Client entity)
+        public static Models.Client ToModel(this Entities.Client entity)
         {
-            return Mapper.Map<Client>(entity);
+            return Mapper.Map<Models.Client>(entity);
         }
 
         /// <summary>
@@ -33,7 +32,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Extensions
         /// </summary>
         /// <param name="model">The IdentityServer4.Models.Client to gather data from.</param>
         /// <returns>An instance of IdentityServer4.Contrib.CosmosDB.Entities.Client.</returns>
-        public static Entities.Client ToEntity(this Client model)
+        public static Entities.Client ToEntity(this Models.Client model)
         {
             return Mapper.Map<Entities.Client>(model);
         }

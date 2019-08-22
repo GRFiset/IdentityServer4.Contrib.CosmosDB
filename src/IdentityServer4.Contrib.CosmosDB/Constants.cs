@@ -28,6 +28,8 @@
             public const string ClientIdPRestriction = "ClientIdPRestrictions";
             public const string ClientCorsOrigin = "ClientCorsOrigins";
 
+            public const string Configurations = "Configurations";
+
             // Operational
             public const string PersistedGrant = "PersistedGrants";
         }
@@ -38,6 +40,8 @@
             public const string ApiResource = "/name";
             public const string Client = "/clientId";
             public const string PersistedGrant = "/clientId";
+
+            public const string Global = "/kind";
         }
 
         public class Placeholders

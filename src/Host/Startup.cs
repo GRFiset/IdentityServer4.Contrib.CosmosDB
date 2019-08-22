@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Host.Configuration;
 using Host.Extensions;
+using IdentityServer4.Contrib.CosmosDB.Entities;
 using IdentityServer4.Contrib.CosmosDB.Extensions;
 using IdentityServer4.Contrib.CosmosDB.Interfaces;
 using IdentityServer4.Quickstart.UI;
@@ -74,12 +77,6 @@ namespace Host
             else
                 app.UseHsts();
 
-            // Setup Databases
-            using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
-            {
-                EnsureSeedData(serviceScope.ServiceProvider.GetService<IConfigurationDbContext>());
-            }
-
             app.UseIdentityServer();
             app.UseIdentityServerCosmosDbTokenCleanup(applicationLifetime);
 
@@ -88,24 +85,24 @@ namespace Host
             app.UseMvcWithDefaultRoute();
         }
 
-        private static void EnsureSeedData(IConfigurationDbContext context)
+        private static async Task EnsureSeedData(IConfigurationDbContext context)
         {
-            foreach (var client in Clients.Get().ToList())
+            foreach (IdentityServer4.Models.Client client in Clients.Get().ToList())
             {
-                var dbRecords = context.Clients(client.ClientId).ToList();
-                if (dbRecords.Count == 0) context.AddClient(client.ToEntity());
+                var dbRecords = await context.GetDocument<Client>(x => x.ClientId == client.ClientId);
+                if (dbRecords.ToList().Count == 0) await context.AddDocument(client.ToEntity());
             }
 
-            foreach (var resource in Resources.GetIdentityResources().ToList())
+            foreach (IdentityServer4.Models.IdentityResource resource in Resources.GetIdentityResources().ToList())
             {
-                var dbRecords = context.IdentityResources(resource.Name).ToList();
-                if (dbRecords.Count == 0) context.AddIdentityResource(resource.ToEntity());
+                var dbRecords = await context.GetDocument<IdentityResource>();
+                if (dbRecords.ToList().Count == 0) await context.AddDocument(resource.ToEntity());
             }
 
-            foreach (var resource in Resources.GetApiResources().ToList())
+            foreach (IdentityServer4.Models.ApiResource resource in Resources.GetApiResources().ToList())
             {
-                var dbRecords = context.ApiResources(resource.Name).ToList();
-                if (dbRecords.Count == 0) context.AddApiResource(resource.ToEntity());
+                var dbRecords = await context.GetDocument<ApiResource>();
+                if (dbRecords.ToList().Count == 0) await context.AddDocument(resource.ToEntity());
             }
         }
     }

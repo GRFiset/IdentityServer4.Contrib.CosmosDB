@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
@@ -10,6 +11,7 @@ using IdentityServer4.Contrib.CosmosDB.Extensions;
 using IdentityServer4.Contrib.CosmosDB.Interfaces;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
+using Microsoft.Azure.Documents.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,7 +25,7 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
     {
         private DocumentCollection _persistedGrants;
         private Uri _persistedGrantsUri;
-
+        private string databaseId;
         /// <summary>
         ///     Create an instance of the PersistedGrantDbContext Class.
         /// </summary>
@@ -32,13 +34,52 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
         /// <param name="connectionPolicy"></param>
         /// <param name="logger"></param>
         public PersistedGrantDbContext(IOptions<CosmosDbConfiguration> settings,
+                                       ICosmostClient cosmosClient,
             string databaseName = Constants.DatabaseName,
             ConnectionPolicy connectionPolicy = null,
             ILogger<PersistedGrantDbContext> logger = null)
-            : base(settings, databaseName, connectionPolicy, logger)
+            : base(settings, cosmosClient, logger)
         {
             Guard.ForNullOrDefault(settings.Value, nameof(settings));
-            SetupPersistedGrants().Wait();
+
+            databaseId = Configuration.DatabaseName.GetValueOrDefault(databaseName);
+            _persistedGrantsUri =
+                UriFactory.CreateDocumentCollectionUri(databaseId, Constants.CollectionNames.PersistedGrant);
+            Logger?.LogDebug($"Persisted Grants URI: {_persistedGrantsUri}");
+
+            var partitionKeyDefinition = new PartitionKeyDefinition
+                { Paths = { Constants.CollectionPartitionKeys.PersistedGrant } };
+            Logger?.LogDebug($"Persisted Grants Partition Key: {partitionKeyDefinition}");
+
+            var indexingPolicy = new IndexingPolicy
+            {
+                Automatic = true,
+                IndexingMode = IndexingMode.Consistent,
+                IncludedPaths =
+                {
+                    new IncludedPath
+                    {
+                        Path = "/expiration/?",
+                        Indexes =
+                        {
+                            Index.Range(DataType.String)
+                        }
+                    },
+                    new IncludedPath
+                    {
+                        Path = "/",
+                        Indexes = {Index.Range(DataType.String)}
+                    }
+                }
+            };
+            Logger?.LogDebug($"Persisted Grants Indexing Policy: {indexingPolicy}");
+
+            _persistedGrants = new DocumentCollection
+            {
+                Id = Constants.CollectionNames.PersistedGrant,
+                PartitionKey = partitionKeyDefinition,
+                IndexingPolicy = indexingPolicy
+            };
         }
 
 
@@ -59,7 +100,11 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
         /// <returns></returns>
         public async Task Remove(Expression<Func<PersistedGrant, bool>> filter)
         {
-            foreach (var persistedGrant in PersistedGrants().Where(filter)) await Remove(persistedGrant);
+            IEnumerable<PersistedGrant> persistedGrants = await PersistedGrants(filter);
+            foreach (var persistedGrant in persistedGrants)
+            {
+                await Remove(persistedGrant);
+            }
         }
 
         /// <summary>
@@ -68,7 +113,7 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
         /// <returns></returns>
         public async Task RemoveExpired()
         {
-            foreach (var expired in PersistedGrants().Where(x => x.Expiration < DateTime.UtcNow)) await Remove(expired);
+            await Remove(x => x.Expiration < DateTime.UtcNow);
         }
 
         /// <summary>
@@ -78,7 +123,7 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
         /// <returns></returns>
         public async Task Update(PersistedGrant entity)
         {
-            var documentUrl = UriFactory.CreateDocumentUri(Database.Id, _persistedGrants.Id, entity.ClientId);
+            var documentUrl = UriFactory.CreateDocumentUri(databaseId, _persistedGrants.Id, entity.Id);
             await DocumentClient.ReplaceDocumentAsync(documentUrl, entity);
         }
 
@@ -102,26 +147,60 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
         /// <returns></returns>
         public async Task Remove(PersistedGrant entity)
         {
-            var documentUrl = UriFactory.CreateDocumentUri(Database.Id, _persistedGrants.Id, entity.ClientId);
-            await DocumentClient.DeleteDocumentAsync(documentUrl);
+            Uri documentUrl = UriFactory.CreateDocumentUri(databaseId, _persistedGrants.Id, entity.Id);
+            await DocumentClient.DeleteDocumentAsync(documentUrl, new RequestOptions { PartitionKey = new PartitionKey(entity.ClientId) });
         }
 
         /// <summary>
         ///     Queryable Persisted Grants.
         /// </summary>
-        public IQueryable<PersistedGrant> PersistedGrants(string partitionKey = "")
+        public async Task<IEnumerable<PersistedGrant>> PersistedGrants(Expression<Func<PersistedGrant, bool>> predicate = null, string partitionKey = "")
         {
-            return string.IsNullOrWhiteSpace(partitionKey)
-                ? DocumentClient.CreateDocumentQuery<PersistedGrant>(_persistedGrantsUri,
-                    new FeedOptions {EnableCrossPartitionQuery = true})
-                : DocumentClient.CreateDocumentQuery<PersistedGrant>(_persistedGrantsUri,
-                    new FeedOptions {PartitionKey = new PartitionKey(partitionKey)});
+            FeedOptions feedOptions;
+            if (string.IsNullOrWhiteSpace(partitionKey))
+            {
+                feedOptions = new FeedOptions
+                {
+                    EnableCrossPartitionQuery = true
+                };
+            }
+            else
+            {
+                feedOptions = new FeedOptions
+                {
+                    PartitionKey = new PartitionKey(partitionKey)
+                };
+            }
+
+            IDocumentQuery<PersistedGrant> query;
+            if (predicate == null)
+            {
+                query = DocumentClient.CreateDocumentQuery<PersistedGrant>(_persistedGrantsUri, feedOptions)
+                    .AsDocumentQuery();
+            }
+            else
+            {
+                query = DocumentClient.CreateDocumentQuery<PersistedGrant>(_persistedGrantsUri, feedOptions)
+                    .Where(predicate)
+                    .AsDocumentQuery();
+            }
+
+            var results = new List<PersistedGrant>();
+            while (query.HasMoreResults)
+            {
+                FeedResponse<PersistedGrant> res = await query.ExecuteNextAsync<PersistedGrant>();
+                results.AddRange(res);
+            }
+
+            return results;
         }
 
-        private async Task SetupPersistedGrants()
+        public async Task SetupPersistedGrants()
         {
+            EnsureDatabaseCreated(Constants.DatabaseName);
+
             _persistedGrantsUri =
-                UriFactory.CreateDocumentCollectionUri(Database.Id, Constants.CollectionNames.PersistedGrant);
+                UriFactory.CreateDocumentCollectionUri(databaseId, Constants.CollectionNames.PersistedGrant);
             Logger?.LogDebug($"Persisted Grants URI: {_persistedGrantsUri}");
 
             var partitionKeyDefinition = new PartitionKeyDefinition
@@ -151,30 +230,13 @@ namespace IdentityServer4.Contrib.CosmosDB.DbContext
             };
             Logger?.LogDebug($"Persisted Grants Indexing Policy: {indexingPolicy}");
 
-            var uniqueKeyPolicy = new UniqueKeyPolicy
-            {
-                UniqueKeys =
-                {
-                    new UniqueKey
-                    {
-                        Paths =
-                        {
-                            "/clientId",
-                            "/subjectId",
-                            "/type"
-                        }
-                    }
-                }
-            };
-            Logger?.LogDebug($"Persisted Grants Unique Key Policy: {uniqueKeyPolicy}");
-
             _persistedGrants = new DocumentCollection
             {
                 Id = Constants.CollectionNames.PersistedGrant,
                 PartitionKey = partitionKeyDefinition,
-                IndexingPolicy = indexingPolicy,
-                UniqueKeyPolicy = uniqueKeyPolicy
+                IndexingPolicy = indexingPolicy
             };
+
             Logger?.LogDebug($"Persisted Grants Collection: {_persistedGrants}");
 
             var persistedGrantsRequestOptions = new RequestOptions

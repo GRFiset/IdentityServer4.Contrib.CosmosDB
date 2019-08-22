@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using IdentityServer4.Contrib.CosmosDB.Entities;
 using IdentityServer4.Contrib.CosmosDB.Interfaces;
 using IdentityServer4.Services;
 using Microsoft.Extensions.Logging;
@@ -21,10 +22,10 @@ namespace IdentityServer4.Contrib.CosmosDB.Services
             _logger = logger;
         }
 
-        public Task<bool> IsOriginAllowedAsync(string origin)
+        public async Task<bool> IsOriginAllowedAsync(string origin)
         {
             // If we use SelectMany directly, we got a Unsupported Exception inside CosmosDb.
-            var clients = _context.Clients().ToList();
+            var clients = await _context.GetDocument<Client>();
             var distinctOrigins = clients.Where(x => x != null)
                 .SelectMany(x => x.AllowedCorsOrigins.Select(y => y.Origin))
                 .Distinct()
@@ -34,7 +35,7 @@ namespace IdentityServer4.Contrib.CosmosDB.Services
 
             _logger.LogDebug("Origin {origin} is allowed: {originAllowed}", origin, isAllowed);
 
-            return Task.FromResult(isAllowed);
+            return isAllowed;
         }
     }
 }

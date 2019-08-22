@@ -12,6 +12,12 @@ namespace IdentityServer4.Contrib.CosmosDB.Entities
     public class Client : EntityBase
     {
         /// <summary>
+        ///     
+        /// </summary>
+        [JsonProperty("kind")]
+        public string Kind { get; set; }
+
+        /// <summary>
         ///     Specifies if client is enabled (defaults to <c>true</c>)
         /// </summary>
         /// <remarks>Default value is true.</remarks>

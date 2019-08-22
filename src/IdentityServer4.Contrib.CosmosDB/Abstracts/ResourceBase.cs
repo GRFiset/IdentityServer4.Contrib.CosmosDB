@@ -11,6 +11,12 @@ namespace IdentityServer4.Contrib.CosmosDB.Abstracts
     public abstract class ResourceBase : EntityBase
     {
         /// <summary>
+        ///     
+        /// </summary>
+        [JsonProperty("kind")]
+        public string Kind { get; set; }
+
+        /// <summary>
         ///     Indicates if this resource is enabled. Defaults to true.
         /// </summary>
         [JsonProperty("enabled")]
